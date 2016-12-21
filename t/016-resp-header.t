@@ -8,7 +8,7 @@ use Test::Nginx::Socket::Lua;
 
 repeat_each(2);
 
-plan tests => repeat_each() * (blocks() * 3 + 40);
+plan tests => 6;#repeat_each() * (blocks() * 3 + 40);
 
 #no_diff();
 no_long_string();
@@ -1485,3 +1485,25 @@ image/png
 image/png
 --- no_error_log
 [error]
+
+
+
+=== TEST 71: return the matched content-type after ngx.resp.get_headers()
+--- http_config
+types {
+    image/png png;
+}
+--- config
+    location /set/ {
+        default_type text/html;
+        content_by_lua_block {
+            local h = ngx.resp.get_headers()
+        }
+    }
+--- request
+GET /set/hello.png
+--- response_headers
+Content-Type: image/png
+--- no_error_log
+[error]
+--- ONLY
