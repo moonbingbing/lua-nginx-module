@@ -613,7 +613,7 @@ ngx_http_lua_ngx_header_get(lua_State *L)
 
     ctx = ngx_http_get_module_ctx(r, ngx_http_lua_module);
     if (ctx == NULL) {
-        return luaL_error(L, "no ctx");
+        return luaL_error(L, "no ctx found");
     }
 
     ngx_http_lua_check_fake_request(L, r);
