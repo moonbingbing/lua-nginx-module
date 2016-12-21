@@ -477,6 +477,21 @@ ngx_http_lua_ngx_resp_get_headers(lua_State *L)
         return luaL_error(L, "no request object found");
     }
 
+    ctx = ngx_http_get_module_ctx(r, ngx_http_lua_module);
+    if (ctx == NULL) {
+        return luaL_error(L, "no ctx found");
+    }
+
+    if (!ctx->headers_set) {
+        rc = ngx_http_lua_set_content_type(r);
+        if (rc != NGX_OK) {
+            return luaL_error(L,
+                              "failed to set default content type: %d",
+                              (int) rc);
+        }
+        ctx->headers_set = 1;
+    }
+
     ngx_http_lua_check_fake_request(L, r);
 
     part = &r->headers_out.headers.part;
@@ -592,20 +607,7 @@ ngx_http_lua_ngx_resp_get_headers(lua_State *L)
         }
     }
 
-    ctx = ngx_http_get_module_ctx(r, ngx_http_lua_module);
-    if (ctx == NULL) {
-        return luaL_error(L, "no ctx found");
-    }
-    
-    if (!ctx->headers_set) {
-        rc = ngx_http_lua_set_content_type(r);
-        if (rc != NGX_OK) {
-            return luaL_error(L,
-                              "failed to set default content type: %d",
-                              (int) rc);
-        }
-        ctx->headers_set = 1;
-    }
+
 
     return 1;
 }

@@ -1498,12 +1498,15 @@ types {
         default_type text/html;
         content_by_lua_block {
             local h = ngx.resp.get_headers()
+            ngx.say(h["content-type"])
         }
     }
 --- request
 GET /set/hello.png
 --- response_headers
 Content-Type: image/png
+--- response_body
+image/png
 --- no_error_log
 [error]
 --- ONLY
