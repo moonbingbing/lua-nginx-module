@@ -59,6 +59,7 @@ static int ngx_http_lua_socket_udp_close(lua_State *L);
 static ngx_int_t ngx_http_lua_socket_udp_resume(ngx_http_request_t *r);
 static void ngx_http_lua_udp_resolve_cleanup(void *data);
 static void ngx_http_lua_udp_socket_cleanup(void *data);
+static int ngx_http_lua_socket_udp_setkeepalive(lua_State *L);
 
 
 enum {
@@ -82,7 +83,7 @@ ngx_http_lua_inject_socket_udp_api(ngx_log_t *log, lua_State *L)
 
     /* udp socket object metatable */
     lua_pushlightuserdata(L, &ngx_http_lua_socket_udp_metatable_key);
-    lua_createtable(L, 0 /* narr */, 6 /* nrec */);
+    lua_createtable(L, 0 /* narr */, 7 /* nrec */);
 
     lua_pushcfunction(L, ngx_http_lua_socket_udp_setpeername);
     lua_setfield(L, -2, "setpeername"); /* ngx socket mt */
@@ -98,6 +99,9 @@ ngx_http_lua_inject_socket_udp_api(ngx_log_t *log, lua_State *L)
 
     lua_pushcfunction(L, ngx_http_lua_socket_udp_close);
     lua_setfield(L, -2, "close"); /* ngx socket mt */
+
+    lua_pushcfunction(L, ngx_http_lua_socket_udp_setkeepalive);
+    lua_setfield(L, -2, "setkeepalive"); /* ngx socket mt */
 
     lua_pushvalue(L, -1);
     lua_setfield(L, -2, "__index");
@@ -1610,6 +1614,12 @@ ngx_http_lua_udp_socket_cleanup(void *data)
     }
 
     ngx_http_lua_socket_udp_finalize(u->request, u);
+}
+
+
+static int
+ngx_http_lua_socket_udp_setkeepalive(lua_State *L)
+{
 }
 
 /* vi:set ft=c ts=4 sw=4 et fdm=marker: */
