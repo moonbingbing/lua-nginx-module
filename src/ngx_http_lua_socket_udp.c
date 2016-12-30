@@ -1734,8 +1734,8 @@ ngx_http_lua_get_keepalive_peer(ngx_http_request_t *r, lua_State *L,
         c->data = u;
 
 #if 1
-        c->write->handler = ngx_http_lua_socket_tcp_handler;
-        c->read->handler = ngx_http_lua_socket_tcp_handler;
+        c->write->handler = ngx_http_lua_socket_udp_handler;
+        c->read->handler = ngx_http_lua_socket_udp_handler;
 #endif
 
         if (c->read->timer_set) {
@@ -1760,7 +1760,7 @@ ngx_http_lua_get_keepalive_peer(ngx_http_request_t *r, lua_State *L,
                 return NGX_ERROR;
             }
 
-            cln->handler = ngx_http_lua_socket_tcp_cleanup;
+            cln->handler = ngx_http_lua_socket_udp_cleanup;
             cln->data = u;
             u->cleanup = &cln->handler;
         }
@@ -1771,7 +1771,7 @@ ngx_http_lua_get_keepalive_peer(ngx_http_request_t *r, lua_State *L,
     }
 
     ngx_log_debug0(NGX_LOG_DEBUG_HTTP, pc->log, 0,
-                   "lua tcp socket keepalive: connection pool empty");
+                   "lua udp socket keepalive: connection pool empty");
 
     lua_settop(L, top);
 
