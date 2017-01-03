@@ -54,6 +54,8 @@ struct ngx_http_lua_socket_udp_upstream_s {
     ngx_http_lua_co_ctx_t           *co_ctx;
 
     unsigned                         waiting; /* :1 */
+
+    ngx_uint_t                       reused;
 };
 
 

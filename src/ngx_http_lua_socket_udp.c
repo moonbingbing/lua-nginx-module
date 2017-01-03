@@ -1678,14 +1678,12 @@ ngx_http_lua_socket_udp_setkeepalive(lua_State *L)
     ngx_str_t                            key;
     ngx_uint_t                           i;
     ngx_queue_t                         *q;
-    ngx_peer_connection_t               *pc;
     u_char                              *p;
     ngx_http_request_t                  *r;
     ngx_msec_t                           timeout;
     ngx_uint_t                           pool_size;
     int                                  n;
     ngx_int_t                            rc;
-    ngx_buf_t                           *b;
 
     ngx_http_lua_socket_pool_item_t     *items, *item;
 
@@ -1737,17 +1735,7 @@ ngx_http_lua_socket_udp_setkeepalive(lua_State *L)
         return 2;
     }
 
-    b = &u->buffer;
-
-    if (b->start && ngx_buf_size(b)) {
-        ngx_http_lua_probe_socket_tcp_setkeepalive_buf_unread(r, u, b->pos,
-                                                              b->last - b->pos);
-
-        lua_pushnil(L);
-        lua_pushliteral(L, "unread data in buffer");
-        return 2;
-    }
-
+    c = u->udp_connection.connection;
     if (c->read->eof
         || c->read->error
         || c->read->timedout
@@ -1765,8 +1753,8 @@ ngx_http_lua_socket_udp_setkeepalive(lua_State *L)
         return 2;
     }
 
-    ngx_log_debug1(NGX_LOG_DEBUG_HTTP, pc->log, 0,
-                   "lua tcp socket set keepalive: saving connection %p", c);
+    ngx_log_debug1(NGX_LOG_DEBUG_HTTP, u->udp_connection->log, 0,
+                   "lua udp socket set keepalive: saving connection %p", c);
 
     dd("saving connection to key %s", lua_tostring(L, -1));
 
@@ -1796,7 +1784,7 @@ ngx_http_lua_socket_udp_setkeepalive(lua_State *L)
         }
 
         ngx_log_debug1(NGX_LOG_DEBUG_HTTP, r->connection->log, 0,
-                       "lua tcp socket connection pool size: %ui", pool_size);
+                       "lua udp socket connection pool size: %ui", pool_size);
 
         key_len = ngx_align(key.len + 1, sizeof(void *));
 
@@ -1813,8 +1801,8 @@ ngx_http_lua_socket_udp_setkeepalive(lua_State *L)
         lua_rawget(L, LUA_REGISTRYINDEX);
         lua_setmetatable(L, -2);
 
-        ngx_log_debug1(NGX_LOG_DEBUG_HTTP, pc->log, 0,
-                       "lua tcp socket keepalive create connection pool for key"
+        ngx_log_debug1(NGX_LOG_DEBUG_HTTP, u->udp_connection->log, 0,
+                       "lua udp socket keepalive create connection pool for key"
                        " \"%s\"", lua_tostring(L, -2));
 
         lua_rawset(L, -3);
@@ -1849,7 +1837,7 @@ ngx_http_lua_socket_udp_setkeepalive(lua_State *L)
 
         item = ngx_queue_data(q, ngx_http_lua_socket_pool_item_t, queue);
 
-        ngx_http_lua_socket_tcp_close_connection(item->connection);
+        ngx_close_connection(item->connection);
 
     } else {
         q = ngx_queue_head(&spool->free);
@@ -1865,17 +1853,10 @@ ngx_http_lua_socket_udp_setkeepalive(lua_State *L)
         spool->active_connections++;
     }
 
-    ngx_log_debug0(NGX_LOG_DEBUG_HTTP, pc->log, 0,
-                   "lua tcp socket clear current socket connection");
+    ngx_log_debug0(NGX_LOG_DEBUG_HTTP, u->udp_connection->log, 0,
+                   "lua udp socket clear current socket connection");
 
-    pc->connection = NULL;
-
-#if 0
-    if (u->cleanup) {
-        *u->cleanup = NULL;
-        u->cleanup = NULL;
-    }
-#endif
+    u->udp_connection.connection = NULL;
 
     if (c->read->timer_set) {
         ngx_del_timer(c->read);
@@ -1895,13 +1876,13 @@ ngx_http_lua_socket_udp_setkeepalive(lua_State *L)
 #if (NGX_DEBUG)
     if (timeout == 0) {
         ngx_log_debug0(NGX_LOG_DEBUG_HTTP, r->connection->log, 0,
-                       "lua tcp socket keepalive timeout: unlimited");
+                       "lua udp socket keepalive timeout: unlimited");
     }
 #endif
 
     if (timeout) {
         ngx_log_debug1(NGX_LOG_DEBUG_HTTP, r->connection->log, 0,
-                       "lua tcp socket keepalive timeout: %M ms", timeout);
+                       "lua udp socket keepalive timeout: %M ms", timeout);
 
         ngx_add_timer(c->read, timeout);
     }
@@ -1930,7 +1911,7 @@ ngx_http_lua_socket_udp_setkeepalive(lua_State *L)
     }
 
 #if 1
-    ngx_http_lua_socket_tcp_finalize(r, u);
+    ngx_http_lua_socket_udp_finalize(r, u);
 #endif
 
     lua_pushinteger(L, 1);
@@ -1947,7 +1928,7 @@ ngx_http_lua_get_keepalive_peer(ngx_http_request_t *r, lua_State *L,
     ngx_http_cleanup_t                  *cln;
     ngx_queue_t                         *q;
     int                                  top;
-    ngx_peer_connection_t               *pc;
+    ngx_http_lua_udp_connection_t       *uc;
     ngx_connection_t                    *c;
 
     top = lua_gettop(L);
@@ -1959,7 +1940,7 @@ ngx_http_lua_get_keepalive_peer(ngx_http_request_t *r, lua_State *L,
     ngx_log_debug0(NGX_LOG_DEBUG_HTTP, r->connection->log, 0,
                    "lua udp socket pool get keepalive peer");
 
-    pc = &u->peer;
+    uc = &u->udp_connection;
 
     lua_pushlightuserdata(L, &ngx_http_lua_socket_pool_key);
     lua_rawget(L, LUA_REGISTRYINDEX); /* table */
@@ -1968,7 +1949,7 @@ ngx_http_lua_get_keepalive_peer(ngx_http_request_t *r, lua_State *L,
 
     spool = lua_touserdata(L, -1);
     if (spool == NULL) {
-        ngx_log_debug0(NGX_LOG_DEBUG_HTTP, pc->log, 0,
+        ngx_log_debug0(NGX_LOG_DEBUG_HTTP, uc->log, 0,
                        "lua udp socket keepalive connection pool not found");
         lua_settop(L, top);
         return NGX_DECLINED;
@@ -1985,19 +1966,19 @@ ngx_http_lua_get_keepalive_peer(ngx_http_request_t *r, lua_State *L,
         ngx_queue_remove(q);
         ngx_queue_insert_head(&spool->free, q);
 
-        ngx_log_debug2(NGX_LOG_DEBUG_HTTP, pc->log, 0,
+        ngx_log_debug2(NGX_LOG_DEBUG_HTTP, uc->log, 0,
                        "lua udp socket get keepalive peer: using connection %p,"
                        " fd:%d", c, c->fd);
 
         c->idle = 0;
-        c->log = pc->log;
-        c->pool->log = pc->log;
-        c->read->log = pc->log;
-        c->write->log = pc->log;
+        c->log = uc->log;
+        c->pool->log = uc->log;
+        c->read->log = uc->log;
+        c->write->log = uc->log;
         c->data = u;
 
 #if 1
-        c->write->handler = ngx_http_lua_socket_udp_handler;
+        c->write->handler = NULL;
         c->read->handler = ngx_http_lua_socket_udp_handler;
 #endif
 
@@ -2005,8 +1986,8 @@ ngx_http_lua_get_keepalive_peer(ngx_http_request_t *r, lua_State *L,
             ngx_del_timer(c->read);
         }
 
-        pc->connection = c;
-        pc->cached = 1;
+        uc->connection = c;
+        uc->cached = 1;
 
         u->reused = item->reused + 1;
 
@@ -2033,7 +2014,7 @@ ngx_http_lua_get_keepalive_peer(ngx_http_request_t *r, lua_State *L,
         return NGX_OK;
     }
 
-    ngx_log_debug0(NGX_LOG_DEBUG_HTTP, pc->log, 0,
+    ngx_log_debug0(NGX_LOG_DEBUG_HTTP, uc->log, 0,
                    "lua udp socket keepalive: connection pool empty");
 
     lua_settop(L, top);
