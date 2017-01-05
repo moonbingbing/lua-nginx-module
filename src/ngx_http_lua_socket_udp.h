@@ -20,10 +20,6 @@ typedef
         ngx_http_lua_socket_udp_upstream_t *u, lua_State *L);
 
 
-typedef void (*ngx_http_lua_socket_udp_upstream_handler_pt)
-    (ngx_http_request_t *r, ngx_http_lua_socket_udp_upstream_t *u);
-
-
 typedef struct {
     ngx_connection_t         *connection;
     struct sockaddr          *sockaddr;
@@ -36,6 +32,7 @@ typedef struct {
 struct ngx_http_lua_socket_udp_upstream_s {
     ngx_http_lua_socket_udp_retval_handler          prepare_retvals;
     ngx_http_lua_socket_udp_upstream_handler_pt     read_event_handler;
+    ngx_http_lua_socket_pool_t      *socket_pool;
 
     ngx_http_lua_loc_conf_t         *conf;
     ngx_http_cleanup_pt             *cleanup;
