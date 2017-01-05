@@ -67,7 +67,8 @@ static ngx_int_t ngx_http_lua_get_keepalive_peer(ngx_http_request_t *r,
 
 enum {
     SOCKET_CTX_INDEX = 1,
-    SOCKET_TIMEOUT_INDEX = 2
+    SOCKET_TIMEOUT_INDEX = 2,
+    SOCKET_KEY_INDEX = 3
 };
 
 
